@@ -1,11 +1,7 @@
-from sqlalchemy import select
-
-from core.queueing import submit, result
-from core.records import get, insert, need, scan, update
+from core.records import get, need, scan, update
+from domain import dispatch_service
 from domain.matches_model import matches
 from domain.plies_model import plies
-from domain.referee_flags_model import referee_flags
-from domain.errata_model import errata
 
 
 def review_window(conn, user, data):
@@ -13,4 +9,6 @@ def review_window(conn, user, data):
     outstanding=[r for r in scan(conn,plies) if r['game']==data.game and r['capture_claim']!=r['replayed'] and
                  not r['adjudicated']]
     need(data.open or not outstanding,'尚有提子疑点待勘误')
+    if not data.open:
+        dispatch_service.release_for_seal(conn, data.game)
     return update(conn,matches,data.game,open=data.open)

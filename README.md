@@ -53,10 +53,19 @@ Compose 运行 Nginx、Python FastAPI、独立 Redis 消费进程、SQL 数据�
 |---|---|---|
 | 对局原件 | `/matches` /matches/review-window | `frontend/src/pages/matches.js` |
 | 棋钟与手次 | `/plies` /plies/attach-ply，/plies/verify-replay | `frontend/src/pages/plies.js` |
+| 复盘派单台 | `/dispatch_orders` /dispatch_orders/plan，/claim，/swap，/report | `frontend/src/pages/plies.js` |
 | 嫌疑签条 | `/referee_flags` /referee_flags/triage，/referee_flags/attach-flag | `frontend/src/pages/referee_flags.js` |
 | 裁判勘误本 | `/errata` /errata/issue-erratum | `frontend/src/pages/errata.js` |
 
-SQL 实体与约束在 `backend/domain` 下维护。前端使用原生 ES modules。核心算子为 SGDClassifier hinge。在固定种子生成的三类模拟原件特征上训练 SGD hinge，按类留出 27 条，回传判别分数。
+复盘只有三张桌，派单在 `backend/domain/dispatch_service.py` 中维护，模型约束在 `dispatch_model.py`：
+
+- **派单**：`/dispatch_orders/plan` 按 SGD hinge 对每手次的「核对提子」判别分从高到低补满空桌；每局最多占一桌，取该局最高分的一个手次。已重放（`witness`）或已封账的手次不再派。
+- **换单与领单**：两者在同一派单顾问锁下提交，先落库者生效。先领到即按原单做（`claimed` 后不可换）；先换成的高分手次撤下原单，原领单须重新领。
+- **报数腾桌**：`/dispatch_orders/report` 由领单人报完实盘提子数（`done`）后才腾桌，同时把重放数写回手次。
+- **封账**：关闭复盘窗口时调用 `release_for_seal`，已领未报数的手次拦住封账，其余未领的单一律撤回。
+- **中断恢复**：应用启动时执行一次 `plan`，收敛中断遗留的桌位；已重放或已封账的手次不再派。表中两个部分唯一索引（桌号、对局）在库层兜底一桌一单、一局一桌。
+
+SQL 实体与约束在 `backend/domain` 下维护。前端使用原生 ES modules。核心算子为 SGDClassifier hinge。在固定种子生成的三类模拟原件特征上训练 SGD hinge，按类留出 27 条，回传判别分数。派单取「核对提子」类的判别分作为优先级分数。
 
 棋谱手次只记录统计特征，线下重放负责核对围棋规则。
 

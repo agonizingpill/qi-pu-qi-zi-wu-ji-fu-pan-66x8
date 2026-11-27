@@ -44,7 +44,8 @@ export function actionForm(action, refresh) {
         if (result.status === 'rejected') throw new Error(result.detail);
         notice.textContent = '任务 ' + data.token + ' · ' + display(result.result);
       } else {
-        notice.textContent = action.success + ' · ' + display(data.code ?? data.status);
+        const subject = data.order?.code ?? data.code ?? data.withdrawn ?? data.status;
+        notice.textContent = action.success + ' · ' + display(subject);
       }
       notice.classList.add('ok');
       await refresh();

@@ -9,6 +9,7 @@ from core.db import metadata, transaction
 from core.config import SEED_DEMO
 from core.middleware import install
 from core.queueing import broker, view
+from domain import dispatch_service
 from domain.routes import routers
 from scripts.seed_demo import seed
 
@@ -21,6 +22,11 @@ async def lifespan(app):
             seed()
         except Exception:
             logging.getLogger('uvicorn.error').exception('demo seed failed')
+    try:
+        with transaction() as conn:
+            dispatch_service.plan(conn)      # 排单中断后恢复：已重放或已封账的手次不再派
+    except Exception:
+        logging.getLogger('uvicorn.error').exception('dispatch recovery failed')
     yield
 
 app = FastAPI(lifespan=lifespan)
